@@ -11,47 +11,36 @@ This repository contains practical implementations of common distributed systems
 ### Basic Examples
 - **[hello-world](examples/hello-world/)** - Basic project structure and Go module organization
 
-### Resilience Patterns (Coming Soon)
-- **Circuit Breaker** - Prevent cascading failures by temporarily blocking requests to failing services
-- **Retry with Backoff** - Intelligent retry mechanisms with exponential backoff and jitter
-- **Timeout Management** - Proper timeout handling for network operations
-- **Bulkhead** - Isolate resources to prevent total system failure
+### Ensuring High Availability
+- **Active/Active Deployments** - Deploy multiple active instances to eliminate single points of failure
+- **Service Discovery & Registry** - Dynamic service registration and discovery for resilient architectures
+- **Leader Election & Coordination** - Coordinate distributed systems with leader election patterns
 
-### Communication Patterns (Coming Soon)
-- **Request-Response** - Synchronous communication patterns
-- **Publish-Subscribe** - Asynchronous messaging patterns
-- **Message Queues** - Reliable message delivery and processing
-- **Event Sourcing** - Event-driven architecture patterns
+### Isolate Failures
+- **Bulkhead Pattern** - Isolate resources to prevent cascading failures across system components
+- **CQRS** - Command Query Responsibility Segregation for separating read and write operations
 
-### Data Patterns (Coming Soon)
-- **CQRS** - Command Query Responsibility Segregation
-- **Saga Pattern** - Distributed transaction management
-- **Event Sourcing** - Storing state as a sequence of events
-- **Database Per Service** - Data isolation in microservices
-
-### Observability Patterns (Coming Soon)
-- **Health Checks** - Service health monitoring
-- **Metrics Collection** - Application and system metrics
-- **Distributed Tracing** - Request tracing across services
-- **Structured Logging** - Consistent logging practices
+### Mitigating External Dependency Risk
+- **Retries & Timeouts** - Intelligent retry mechanisms with exponential backoff and proper timeout handling
+- **Data Caching** - Cache strategies to reduce dependency on external services and improve performance
+- **Circuit Breaker & Fallback** - Prevent cascading failures with circuit breakers and graceful fallback mechanisms
 
 ## Project Structure
 
 ```
 ├── examples/
-│   ├── hello-world/
-│   │   ├── cmd/
-│   │   │   └── main.go
-│   │   ├── internal/
-│   │   └── Makefile
-│   ├── circuit-breaker/
-│   │   ├── cmd/
-│   │   ├── internal/
-│   │   └── Makefile
-│   └── retry-pattern/
-│       ├── cmd/
-│       ├── internal/
-│       └── Makefile
+│   ├── hello-world/                    # Basic project structure
+│   ├── high-availability/
+│   │   ├── active-active/              # Active/Active Deployments
+│   │   ├── service-discovery/          # Service Discovery & Registry
+│   │   └── leader-election/            # Leader Election & Coordination
+│   ├── isolate-failures/
+│   │   ├── bulkhead/                   # Bulkhead Pattern
+│   │   └── cqrs/                       # CQRS
+│   └── external-dependency-risk/
+│       ├── retries-timeouts/           # Retries & Timeouts
+│       ├── data-caching/               # Data Caching
+│       └── circuit-breaker-fallback/   # Circuit Breaker & Fallback
 ├── docs/
 ├── go.mod
 ├── go.sum
@@ -92,6 +81,10 @@ Each example is self-contained with its own Makefile:
 cd examples/hello-world
 make run
 
+# Run a pattern example
+cd examples/external-dependency-risk/circuit-breaker-fallback
+make run
+
 # Build an example
 make build
 
@@ -104,6 +97,14 @@ go test ./...
 # Run with race detection
 go test -race ./...
 ```
+
+### Pattern Categories
+
+Examples are organized by their primary purpose:
+
+- **High Availability**: Patterns that ensure system uptime and availability
+- **Isolate Failures**: Patterns that prevent failures from cascading through the system
+- **External Dependency Risk**: Patterns that mitigate risks from external service dependencies
 
 ## Contributing
 
