@@ -1,4 +1,4 @@
-# Distributed Systems Patterns in Go
+# Resiliency Patterns
 
 A comprehensive collection of examples and demonstrations showcasing different techniques and design patterns for building resilient distributed systems in Go.
 
@@ -67,15 +67,15 @@ Each example is self-contained with:
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.23 or later
 - Docker (for running examples with external dependencies)
 - Make (optional, for convenience commands)
 
 ### Quick Start
 
 ```bash
-git clone https://github.com/your-username/distributed-systems-patterns-go.git
-cd distributed-systems-patterns-go
+git clone https://github.com/cshep4/resiliency-patterns.git
+cd resiliency-patterns
 go mod download
 
 # Try the hello-world example

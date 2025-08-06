@@ -1,5 +1,5 @@
-module distributed-systems-patterns-go
+module github.com/cshep4/resiliency-patterns
 
-go 1.21
+go 1.23
 
 require ()

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"distributed-systems-patterns-go/examples/hello-world/internal"
+	"github.com/cshep4/resiliency-patterns/examples/hello-world/internal"
 )
 
 func main() {
