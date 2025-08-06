@@ -6,63 +6,62 @@ A comprehensive collection of examples and demonstrations showcasing different t
 
 This repository contains practical implementations of common distributed systems patterns, focusing on reliability, scalability, and fault tolerance. Each pattern includes working code examples, explanations, and best practices for real-world applications.
 
-## Patterns Covered
+## Examples
 
-### Resilience Patterns
+### Basic Examples
+- **[hello-world](examples/hello-world/)** - Basic project structure and Go module organization
+
+### Resilience Patterns (Coming Soon)
 - **Circuit Breaker** - Prevent cascading failures by temporarily blocking requests to failing services
 - **Retry with Backoff** - Intelligent retry mechanisms with exponential backoff and jitter
 - **Timeout Management** - Proper timeout handling for network operations
 - **Bulkhead** - Isolate resources to prevent total system failure
 
-### Communication Patterns
+### Communication Patterns (Coming Soon)
 - **Request-Response** - Synchronous communication patterns
 - **Publish-Subscribe** - Asynchronous messaging patterns
 - **Message Queues** - Reliable message delivery and processing
 - **Event Sourcing** - Event-driven architecture patterns
 
-### Data Patterns
+### Data Patterns (Coming Soon)
 - **CQRS** - Command Query Responsibility Segregation
 - **Saga Pattern** - Distributed transaction management
 - **Event Sourcing** - Storing state as a sequence of events
 - **Database Per Service** - Data isolation in microservices
 
-### Observability Patterns
+### Observability Patterns (Coming Soon)
 - **Health Checks** - Service health monitoring
 - **Metrics Collection** - Application and system metrics
 - **Distributed Tracing** - Request tracing across services
 - **Structured Logging** - Consistent logging practices
 
-### Deployment Patterns
-- **Blue-Green Deployment** - Zero-downtime deployments
-- **Canary Releases** - Gradual rollout strategies
-- **Service Discovery** - Dynamic service registration and discovery
-- **Load Balancing** - Traffic distribution strategies
-
 ## Project Structure
 
 ```
-├── patterns/
-│   ├── resilience/
-│   │   ├── circuit-breaker/
-│   │   ├── retry/
-│   │   └── timeout/
-│   ├── communication/
-│   │   ├── request-response/
-│   │   ├── pubsub/
-│   │   └── message-queue/
-│   ├── data/
-│   │   ├── cqrs/
-│   │   ├── saga/
-│   │   └── event-sourcing/
-│   └── observability/
-│       ├── health-checks/
-│       ├── metrics/
-│       └── tracing/
 ├── examples/
-│   └── complete-systems/
+│   ├── hello-world/
+│   │   ├── cmd/
+│   │   │   └── main.go
+│   │   ├── internal/
+│   │   └── Makefile
+│   ├── circuit-breaker/
+│   │   ├── cmd/
+│   │   ├── internal/
+│   │   └── Makefile
+│   └── retry-pattern/
+│       ├── cmd/
+│       ├── internal/
+│       └── Makefile
 ├── docs/
-└── tools/
+├── go.mod
+├── go.sum
+└── Makefile
 ```
+
+Each example is self-contained with:
+- `cmd/` - Entry points and main applications
+- `internal/` - Private implementation code
+- `Makefile` - Build and run commands specific to the example
 
 ## Getting Started
 
@@ -72,24 +71,34 @@ This repository contains practical implementations of common distributed systems
 - Docker (for running examples with external dependencies)
 - Make (optional, for convenience commands)
 
-### Installation
+### Quick Start
 
 ```bash
 git clone https://github.com/your-username/distributed-systems-patterns-go.git
 cd distributed-systems-patterns-go
 go mod download
+
+# Try the hello-world example
+cd examples/hello-world
+make run
 ```
 
 ### Running Examples
 
-Each pattern includes runnable examples:
+Each example is self-contained with its own Makefile:
 
 ```bash
-# Run a specific pattern example
-cd patterns/resilience/circuit-breaker
-go run main.go
+# Run a specific example
+cd examples/hello-world
+make run
 
-# Run tests for all patterns
+# Build an example
+make build
+
+# Run tests for a specific example
+make test
+
+# Run all tests from root
 go test ./...
 
 # Run with race detection
