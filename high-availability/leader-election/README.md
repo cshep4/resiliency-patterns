@@ -30,8 +30,8 @@ This example demonstrates how to implement leader election in a distributed syst
 # Start the demo (single instance)
 make demo
 
-# Or run a specific node
-make run NODE_ID=node-1
+# Or run directly
+make run
 ```
 
 ### Multi-Instance Demo
@@ -39,13 +39,13 @@ make run NODE_ID=node-1
 **Option 1: Manual (3 separate terminals)**
 ```bash
 # Terminal 1
-make run-node1
+make run
 
 # Terminal 2  
-make run-node2
+make run
 
 # Terminal 3
-make run-node3
+make run
 ```
 
 **Option 2: Automatic with tmux**
@@ -57,57 +57,52 @@ make demo-parallel
 make kill-demo
 ```
 
-### Custom Configuration
+### Simple Configuration
 
-```bash
-go run cmd/main.go \
-  -node-id=my-node \
-  -lock-name=my-service \
-  -lease-duration=15s \
-  -retry-period=3s \
-  -lock-dir=/tmp
-```
+No flags needed! The application automatically:
+- Generates unique node IDs using hostname + PID + timestamp
+- Uses sensible defaults for all configuration
+- Creates lock files in `/tmp` directory
 
 ## Example Output
 
 ```
-2024/01/10 14:30:25 Starting leader election demo for node: node-1
-2024/01/10 14:30:25 ✅ [node-1] Leader election started. Press Ctrl+C to stop
-2024/01/10 14:30:27 [node-1] Successfully acquired leadership
-2024/01/10 14:30:27 🎉 [node-1] BECAME LEADER - Starting leadership duties
-2024/01/10 14:30:27 👑 [node-1] Status: LEADER - Heartbeat at 14:30:27
-2024/01/10 14:30:28 👑 [node-1] Status: LEADER - Heartbeat at 14:30:28
-2024/01/10 14:30:29 👑 [node-1] Status: LEADER - Heartbeat at 14:30:29
+2024/01/10 14:30:25 Starting leader election demo for node: node-hostname-1234-1704902425
+2024/01/10 14:30:25 ✅ [node-hostname-1234-1704902425] Leader election started. Press Ctrl+C to stop
+2024/01/10 14:30:27 [node-hostname-1234-1704902425] Successfully acquired leadership
+2024/01/10 14:30:27 🎉 [node-hostname-1234-1704902425] BECAME LEADER - Starting leadership duties
+2024/01/10 14:30:27 👑 [node-hostname-1234-1704902425] Status: LEADER - Heartbeat at 14:30:27
+2024/01/10 14:30:28 👑 [node-hostname-1234-1704902425] Status: LEADER - Heartbeat at 14:30:28
 ```
 
 When you start additional instances:
 ```
-# node-2 output
-2024/01/10 14:30:30 👥 [node-2] Status: FOLLOWER - Heartbeat at 14:30:30
-2024/01/10 14:30:31 👥 [node-2] Status: FOLLOWER - Heartbeat at 14:30:31
+# Second instance output
+2024/01/10 14:30:30 👥 [node-hostname-5678-1704902430] Status: FOLLOWER - Heartbeat at 14:30:30
+2024/01/10 14:30:31 👥 [node-hostname-5678-1704902430] Status: FOLLOWER - Heartbeat at 14:30:31
 
-# node-3 output  
-2024/01/10 14:30:32 👥 [node-3] Status: FOLLOWER - Heartbeat at 14:30:32
-2024/01/10 14:30:33 👥 [node-3] Status: FOLLOWER - Heartbeat at 14:30:33
+# Third instance output  
+2024/01/10 14:30:32 👥 [node-hostname-9012-1704902432] Status: FOLLOWER - Heartbeat at 14:30:32
+2024/01/10 14:30:33 👥 [node-hostname-9012-1704902432] Status: FOLLOWER - Heartbeat at 14:30:33
 ```
 
 When the leader stops:
 ```
-# node-1 stops, node-2 takes over
-2024/01/10 14:30:45 [node-2] Successfully acquired leadership  
-2024/01/10 14:30:45 🎉 [node-2] BECAME LEADER - Starting leadership duties
-2024/01/10 14:30:45 👑 [node-2] Status: LEADER - Heartbeat at 14:30:45
+# Leader stops, follower takes over
+2024/01/10 14:30:45 [node-hostname-5678-1704902430] Successfully acquired leadership  
+2024/01/10 14:30:45 🎉 [node-hostname-5678-1704902430] BECAME LEADER - Starting leadership duties
+2024/01/10 14:30:45 👑 [node-hostname-5678-1704902430] Status: LEADER - Heartbeat at 14:30:45
 ```
 
-## Configuration Options
+## Default Configuration
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `-node-id` | *required* | Unique identifier for this instance |
-| `-lock-name` | `leader-election-demo` | Name of the leadership lock |
-| `-lock-dir` | `/tmp` | Directory to store lock files |
-| `-lease-duration` | `10s` | How long leadership lease lasts |
-| `-retry-period` | `2s` | How often to attempt leadership |
+| Setting | Value | Description |
+|---------|-------|-------------|
+| Node ID | `node-{hostname}-{pid}-{timestamp}` | Auto-generated unique identifier |
+| Lock Name | `leader-election-demo` | Name of the leadership lock |
+| Lock Directory | `/tmp` | Directory to store lock files |
+| Lease Duration | `10s` | How long leadership lease lasts |
+| Retry Period | `2s` | How often to attempt leadership |
 
 ## Architecture
 

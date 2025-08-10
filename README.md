@@ -14,7 +14,7 @@ This repository contains practical implementations of common distributed systems
 ### Ensuring High Availability
 - **Active/Active Deployments** - Deploy multiple active instances to eliminate single points of failure
 - **Service Discovery & Registry** - Dynamic service registration and discovery for resilient architectures
-- **Leader Election & Coordination** - Coordinate distributed systems with leader election patterns
+- **[Leader Election & Coordination](/high-availability/leader-election/)** - Coordinate distributed systems with leader election patterns
 
 ### Isolate Failures
 - **Bulkhead Pattern** - Isolate resources to prevent cascading failures across system components
@@ -28,20 +28,17 @@ This repository contains practical implementations of common distributed systems
 ## Project Structure
 
 ```
-├── examples/
-│   ├── hello-world/                    # Basic project structure
-│   ├── high-availability/
-│   │   ├── active-active/              # Active/Active Deployments
-│   │   ├── service-discovery/          # Service Discovery & Registry
-│   │   └── leader-election/            # Leader Election & Coordination
-│   ├── isolate-failures/
-│   │   ├── bulkhead/                   # Bulkhead Pattern
-│   │   └── cqrs/                       # CQRS
-│   └── external-dependency-risk/
-│       ├── retries-timeouts/           # Retries & Timeouts
-│       ├── data-caching/               # Data Caching
-│       └── circuit-breaker-fallback/   # Circuit Breaker & Fallback
-├── docs/
+├── high-availability/
+│   ├── active-active/              # Active/Active Deployments
+│   ├── service-discovery/          # Service Discovery & Registry
+│   └── leader-election/            # Leader Election & Coordination
+├── isolate-failures/
+│   ├── bulkhead/                   # Bulkhead Pattern
+│   └── cqrs/                       # CQRS
+├── external-dependency-risk/
+│   ├── retries-timeouts/           # Retries & Timeouts
+│   ├── data-caching/               # Data Caching
+│   └── circuit-breaker-fallback/   # Circuit Breaker & Fallback
 ├── go.mod
 ├── go.sum
 └── Makefile
