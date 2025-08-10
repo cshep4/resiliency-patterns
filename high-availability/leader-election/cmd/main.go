@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"os/signal"
@@ -12,77 +11,35 @@ import (
 	"github.com/cshep4/resiliency-patterns/high-availability/leader-election/internal/leaderelection"
 )
 
-const (
-	LeaseDuration = 10 * time.Second
-	RetryPeriod   = 2 * time.Second
-	LockName      = "leader-election-demo"
-	LockDir       = "/tmp"
-)
-
 func main() {
-	nodeID := uuid.New().String()
+	nodeID := "node-" + uuid.New().String()
 
 	log.Printf("Starting leader election demo for node: %s", nodeID)
-	log.Printf("Lock name: %s, Lock directory: %s", LockName, LockDir)
-	log.Printf("Lease duration: %v, Retry period: %v", LeaseDuration, RetryPeriod)
+	log.Printf("💡 Tip: Run multiple instances to see leader election in action")
 
-	config := leaderelection.LeaseConfig{
-		LeaseDuration: LeaseDuration,
-		RetryPeriod:   RetryPeriod,
-		LockName:      LockName,
-		Identity:      nodeID,
-		LockDir:       LockDir,
-	}
+	elector := leaderelection.NewLeaderElector(nodeID)
 
-	callbacks := leaderelection.LeaderCallbacks{
-		OnStartedLeading: func() {
-			log.Printf("🎉 [%s] BECAME LEADER - Starting leadership duties", nodeID)
-		},
-		OnStoppedLeading: func() {
-			log.Printf("😞 [%s] LOST LEADERSHIP - Stepping down", nodeID)
-		},
-	}
+	// Block until we acquire leadership
+	elector.AcquireLease()
 
-	elector := leaderelection.NewLeaderElector(config, callbacks)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	go elector.Run(ctx)
-
-	go func() {
-		ticker := time.NewTicker(1 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				status := "FOLLOWER"
-				emoji := "👥"
-				if elector.IsLeader() {
-					status = "LEADER"
-					emoji = "👑"
-				}
-				log.Printf("%s [%s] Status: %s - Heartbeat at %s", 
-					emoji, nodeID, status, time.Now().Format("15:04:05"))
-			}
-		}
-	}()
+	// Now we are the leader, start heartbeat loop
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	log.Printf("✅ [%s] Leader election started. Press Ctrl+C to stop", nodeID)
-	log.Printf("💡 Tip: Run multiple instances to see leader election in action")
+	log.Printf("✅ [%s] Now running as LEADER. Press Ctrl+C to stop", nodeID)
 
-	<-sigChan
-	log.Printf("🛑 [%s] Received shutdown signal, stopping...", nodeID)
-
-	elector.Stop()
-	cancel()
-
-	time.Sleep(100 * time.Millisecond)
-	log.Printf("👋 [%s] Shutdown complete", nodeID)
+	for {
+		select {
+		case <-sigChan:
+			log.Printf("🛑 [%s] Received shutdown signal, stopping...", nodeID)
+			log.Printf("👋 [%s] Shutdown complete", nodeID)
+			return
+		case <-ticker.C:
+			log.Printf("👑 [%s] Status: LEADER - Heartbeat at %s", 
+				nodeID, time.Now().Format("15:04:05"))
+		}
+	}
 }

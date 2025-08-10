@@ -1,111 +1,47 @@
 package leaderelection
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
+	"strconv"
+	"strings"
 	"time"
 )
 
 const (
-	DefaultLeaseDuration = 10 * time.Second
-	DefaultRenewDeadline = 8 * time.Second
-	DefaultRetryPeriod   = 2 * time.Second
+	LeaseDuration = 10 * time.Second
+	RetryPeriod   = 2 * time.Second
+	LockName      = "leader-election-demo"
+	LockDir       = "/tmp"
 )
 
-type LeaseConfig struct {
-	LeaseDuration time.Duration
-	RenewDeadline time.Duration
-	RetryPeriod   time.Duration
-	LockName      string
-	Identity      string
-	LockDir       string
-}
-
 type LeaderElector struct {
-	config     LeaseConfig
-	isLeader   bool
-	mu         sync.RWMutex
-	onStarted  func()
-	onStopped  func()
-	lockFile   string
-	cancelFunc context.CancelFunc
+	identity string
+	lockFile string
 }
 
-type LeaderCallbacks struct {
-	OnStartedLeading func()
-	OnStoppedLeading func()
-}
-
-func NewLeaderElector(config LeaseConfig, callbacks LeaderCallbacks) *LeaderElector {
-	if config.LeaseDuration == 0 {
-		config.LeaseDuration = DefaultLeaseDuration
-	}
-	if config.RenewDeadline == 0 {
-		config.RenewDeadline = DefaultRenewDeadline
-	}
-	if config.RetryPeriod == 0 {
-		config.RetryPeriod = DefaultRetryPeriod
-	}
-	if config.LockDir == "" {
-		config.LockDir = "/tmp"
-	}
-
-	lockFile := filepath.Join(config.LockDir, fmt.Sprintf("%s.lock", config.LockName))
+func NewLeaderElector(nodeID string) *LeaderElector {
+	lockFile := filepath.Join(LockDir, fmt.Sprintf("%s.lock", LockName))
 
 	return &LeaderElector{
-		config:    config,
-		onStarted: callbacks.OnStartedLeading,
-		onStopped: callbacks.OnStoppedLeading,
-		lockFile:  lockFile,
+		identity: nodeID,
+		lockFile: lockFile,
 	}
 }
 
-func (le *LeaderElector) Run(ctx context.Context) {
-	ctx, cancel := context.WithCancel(ctx)
-	le.cancelFunc = cancel
-
-	ticker := time.NewTicker(le.config.RetryPeriod)
-	defer ticker.Stop()
-
+func (le *LeaderElector) AcquireLease() {
+	log.Printf("[%s] Attempting to acquire leadership...", le.identity)
+	
 	for {
-		select {
-		case <-ctx.Done():
-			le.releaseLease()
-			return
-		case <-ticker.C:
-			le.tryAcquireOrRenewLease(ctx)
-		}
-	}
-}
-
-func (le *LeaderElector) IsLeader() bool {
-	le.mu.RLock()
-	defer le.mu.RUnlock()
-	return le.isLeader
-}
-
-func (le *LeaderElector) Stop() {
-	if le.cancelFunc != nil {
-		le.cancelFunc()
-	}
-}
-
-func (le *LeaderElector) tryAcquireOrRenewLease(ctx context.Context) {
-	if le.IsLeader() {
-		if le.renewLease() {
+		if le.tryAcquireLease() {
+			log.Printf("🎉 [%s] Successfully acquired leadership!", le.identity)
 			return
 		}
-		log.Printf("[%s] Failed to renew lease, stepping down as leader", le.config.Identity)
-		le.stepDown()
-	}
-
-	if le.tryAcquireLease() {
-		log.Printf("[%s] Successfully acquired leadership", le.config.Identity)
-		le.becomeLeader()
+		
+		log.Printf("[%s] Leadership not available, retrying in %v...", le.identity, RetryPeriod)
+		time.Sleep(RetryPeriod)
 	}
 }
 
@@ -114,7 +50,7 @@ func (le *LeaderElector) tryAcquireLease() bool {
 		if !le.isLeaseExpired() {
 			return false
 		}
-		log.Printf("[%s] Found expired lease, attempting to acquire", le.config.Identity)
+		log.Printf("[%s] Found expired lease, attempting to acquire", le.identity)
 	}
 
 	file, err := os.OpenFile(le.lockFile, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
@@ -123,7 +59,7 @@ func (le *LeaderElector) tryAcquireLease() bool {
 	}
 	defer file.Close()
 
-	leaseData := fmt.Sprintf("%s:%d", le.config.Identity, time.Now().Unix())
+	leaseData := fmt.Sprintf("%s:%d", le.identity, time.Now().Unix())
 	if _, err := file.WriteString(leaseData); err != nil {
 		os.Remove(le.lockFile)
 		return false
@@ -132,56 +68,22 @@ func (le *LeaderElector) tryAcquireLease() bool {
 	return true
 }
 
-func (le *LeaderElector) renewLease() bool {
-	if _, err := os.Stat(le.lockFile); err != nil {
-		return false
-	}
-
-	leaseData := fmt.Sprintf("%s:%d", le.config.Identity, time.Now().Unix())
-	err := os.WriteFile(le.lockFile, []byte(leaseData), 0644)
-	return err == nil
-}
-
 func (le *LeaderElector) isLeaseExpired() bool {
 	data, err := os.ReadFile(le.lockFile)
 	if err != nil {
 		return true
 	}
 
-	var identity string
-	var timestamp int64
-	if _, err := fmt.Sscanf(string(data), "%s:%d", &identity, &timestamp); err != nil {
+	parts := strings.Split(string(data), ":")
+	if len(parts) != 2 {
+		return true
+	}
+	
+	timestamp, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
 		return true
 	}
 
 	leaseTime := time.Unix(timestamp, 0)
-	return time.Since(leaseTime) > le.config.LeaseDuration
-}
-
-func (le *LeaderElector) releaseLease() {
-	if le.IsLeader() {
-		le.stepDown()
-	}
-	os.Remove(le.lockFile)
-}
-
-func (le *LeaderElector) becomeLeader() {
-	le.mu.Lock()
-	le.isLeader = true
-	le.mu.Unlock()
-
-	if le.onStarted != nil {
-		le.onStarted()
-	}
-}
-
-func (le *LeaderElector) stepDown() {
-	le.mu.Lock()
-	wasLeader := le.isLeader
-	le.isLeader = false
-	le.mu.Unlock()
-
-	if wasLeader && le.onStopped != nil {
-		le.onStopped()
-	}
+	return time.Since(leaseTime) > LeaseDuration
 }

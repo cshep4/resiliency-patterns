@@ -1,7 +1,7 @@
 package leaderelection
 
 import (
-	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,135 +9,110 @@ import (
 )
 
 func TestNewLeaderElector(t *testing.T) {
-	config := LeaseConfig{
-		LockName: "test-lock",
-		Identity: "test-node-1",
-	}
-	callbacks := LeaderCallbacks{}
+	nodeID := "test-node-1"
+	le := NewLeaderElector(nodeID)
 
-	le := NewLeaderElector(config, callbacks)
+	if le.identity != nodeID {
+		t.Errorf("Expected identity %s, got %s", nodeID, le.identity)
+	}
 
-	if le.config.LeaseDuration != DefaultLeaseDuration {
-		t.Errorf("Expected default lease duration %v, got %v", DefaultLeaseDuration, le.config.LeaseDuration)
-	}
-	if le.config.RenewDeadline != DefaultRenewDeadline {
-		t.Errorf("Expected default renew deadline %v, got %v", DefaultRenewDeadline, le.config.RenewDeadline)
-	}
-	if le.config.RetryPeriod != DefaultRetryPeriod {
-		t.Errorf("Expected default retry period %v, got %v", DefaultRetryPeriod, le.config.RetryPeriod)
+	expectedLockFile := filepath.Join(LockDir, LockName+".lock")
+	if le.lockFile != expectedLockFile {
+		t.Errorf("Expected lock file %s, got %s", expectedLockFile, le.lockFile)
 	}
 }
 
 func TestTryAcquireLease(t *testing.T) {
 	tmpDir := t.TempDir()
-	config := LeaseConfig{
-		LockName: "test-lock",
-		Identity: "test-node-1",
-		LockDir:  tmpDir,
+	nodeID := "test-node-1"
+	
+	// Create a custom elector with temp directory
+	lockFile := filepath.Join(tmpDir, "test-lock.lock")
+	le := &LeaderElector{
+		identity: nodeID,
+		lockFile: lockFile,
 	}
-	callbacks := LeaderCallbacks{}
-
-	le := NewLeaderElector(config, callbacks)
 
 	if !le.tryAcquireLease() {
 		t.Error("Expected to acquire lease on first attempt")
 	}
 
-	if le.tryAcquireLease() {
+	// Second attempt should fail since lease is held
+	le2 := &LeaderElector{
+		identity: "test-node-2",
+		lockFile: lockFile,
+	}
+	
+	if le2.tryAcquireLease() {
 		t.Error("Expected to fail acquiring lease when already held")
 	}
 
-	os.Remove(le.lockFile)
+	os.Remove(lockFile)
 }
 
 func TestIsLeaseExpired(t *testing.T) {
 	tmpDir := t.TempDir()
-	config := LeaseConfig{
-		LockName:      "test-lock",
-		Identity:      "test-node-1",
-		LockDir:       tmpDir,
-		LeaseDuration: 100 * time.Millisecond,
-	}
-	callbacks := LeaderCallbacks{}
-
-	le := NewLeaderElector(config, callbacks)
-
-	if le.isLeaseExpired() {
-		t.Error("Expected lease to not be expired when file doesn't exist")
+	lockFile := filepath.Join(tmpDir, "test-lock.lock")
+	
+	le := &LeaderElector{
+		identity: "test-node-1",
+		lockFile: lockFile,
 	}
 
-	le.tryAcquireLease()
+	// Non-existent file should be considered expired
+	if !le.isLeaseExpired() {
+		t.Error("Expected lease to be expired when file doesn't exist")
+	}
 
+	// Acquire lease
+	if !le.tryAcquireLease() {
+		t.Fatal("Failed to acquire lease")
+	}
+
+	// Should not be expired immediately after acquisition
 	if le.isLeaseExpired() {
 		t.Error("Expected lease to not be expired immediately after acquisition")
 	}
 
-	time.Sleep(150 * time.Millisecond)
+	// Manually create an expired lease
+	expiredTime := time.Now().Add(-LeaseDuration - time.Second).Unix()
+	leaseData := fmt.Sprintf("test-node-1:%d", expiredTime)
+	os.WriteFile(lockFile, []byte(leaseData), 0644)
 
 	if !le.isLeaseExpired() {
 		t.Error("Expected lease to be expired after lease duration")
 	}
 
-	os.Remove(le.lockFile)
+	os.Remove(lockFile)
 }
 
-func TestLeaderElection(t *testing.T) {
+func TestAcquireLeaseBlocking(t *testing.T) {
 	tmpDir := t.TempDir()
+	lockFile := filepath.Join(tmpDir, "test-lock.lock")
 	
-	var leader1Started, leader1Stopped bool
-	var leader2Started, leader2Stopped bool
-
-	config1 := LeaseConfig{
-		LockName:      "test-lock",
-		Identity:      "node-1",
-		LockDir:       tmpDir,
-		LeaseDuration: 200 * time.Millisecond,
-		RetryPeriod:   50 * time.Millisecond,
+	// First elector acquires lease
+	le1 := &LeaderElector{
+		identity: "test-node-1",
+		lockFile: lockFile,
 	}
-	callbacks1 := LeaderCallbacks{
-		OnStartedLeading: func() { leader1Started = true },
-		OnStoppedLeading: func() { leader1Stopped = true },
+	
+	// Manually acquire lease to simulate blocking scenario
+	le1.tryAcquireLease()
+	
+	// Verify lease is held (file exists and not expired)
+	if _, err := os.Stat(lockFile); err != nil {
+		t.Error("Expected lease file to exist")
 	}
-
-	config2 := LeaseConfig{
-		LockName:      "test-lock",
-		Identity:      "node-2",
-		LockDir:       tmpDir,
-		LeaseDuration: 200 * time.Millisecond,
-		RetryPeriod:   50 * time.Millisecond,
+	
+	// Second elector should not be able to acquire immediately
+	le2 := &LeaderElector{
+		identity: "test-node-2", 
+		lockFile: lockFile,
 	}
-	callbacks2 := LeaderCallbacks{
-		OnStartedLeading: func() { leader2Started = true },
-		OnStoppedLeading: func() { leader2Stopped = true },
+	
+	if le2.tryAcquireLease() {
+		t.Error("Expected second elector to fail acquiring active lease")
 	}
 
-	le1 := NewLeaderElector(config1, callbacks1)
-	le2 := NewLeaderElector(config2, callbacks2)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	go le1.Run(ctx)
-	go le2.Run(ctx)
-
-	time.Sleep(100 * time.Millisecond)
-
-	leadersCount := 0
-	if le1.IsLeader() {
-		leadersCount++
-	}
-	if le2.IsLeader() {
-		leadersCount++
-	}
-
-	if leadersCount != 1 {
-		t.Errorf("Expected exactly 1 leader, got %d", leadersCount)
-	}
-
-	le1.Stop()
-	le2.Stop()
-
-	time.Sleep(100 * time.Millisecond)
-
-	os.Remove(filepath.Join(tmpDir, "test-lock.lock"))
+	os.Remove(lockFile)
 }
