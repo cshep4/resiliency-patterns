@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/cshep4/resiliency-patterns/examples/high-availability/leader-election/internal/leaderelection"
+	"github.com/google/uuid"
+	"github.com/cshep4/resiliency-patterns/high-availability/leader-election/internal/leaderelection"
 )
 
 const (
@@ -20,7 +20,7 @@ const (
 )
 
 func main() {
-	nodeID := generateNodeID()
+	nodeID := uuid.New().String()
 
 	log.Printf("Starting leader election demo for node: %s", nodeID)
 	log.Printf("Lock name: %s, Lock directory: %s", LockName, LockDir)
@@ -85,16 +85,4 @@ func main() {
 
 	time.Sleep(100 * time.Millisecond)
 	log.Printf("👋 [%s] Shutdown complete", nodeID)
-}
-
-func generateNodeID() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "unknown"
-	}
-	
-	pid := os.Getpid()
-	timestamp := time.Now().Unix()
-	
-	return fmt.Sprintf("node-%s-%d-%d", hostname, pid, timestamp)
 }

@@ -67,38 +67,38 @@ No flags needed! The application automatically:
 ## Example Output
 
 ```
-2024/01/10 14:30:25 Starting leader election demo for node: node-hostname-1234-1704902425
-2024/01/10 14:30:25 ✅ [node-hostname-1234-1704902425] Leader election started. Press Ctrl+C to stop
-2024/01/10 14:30:27 [node-hostname-1234-1704902425] Successfully acquired leadership
-2024/01/10 14:30:27 🎉 [node-hostname-1234-1704902425] BECAME LEADER - Starting leadership duties
-2024/01/10 14:30:27 👑 [node-hostname-1234-1704902425] Status: LEADER - Heartbeat at 14:30:27
-2024/01/10 14:30:28 👑 [node-hostname-1234-1704902425] Status: LEADER - Heartbeat at 14:30:28
+2024/01/10 14:30:25 Starting leader election demo for node: node-a1b2c3d4-e5f6-7890-abcd-ef1234567890
+2024/01/10 14:30:25 ✅ [node-a1b2c3d4-e5f6-7890-abcd-ef1234567890] Leader election started. Press Ctrl+C to stop
+2024/01/10 14:30:27 [node-a1b2c3d4-e5f6-7890-abcd-ef1234567890] Successfully acquired leadership
+2024/01/10 14:30:27 🎉 [node-a1b2c3d4-e5f6-7890-abcd-ef1234567890] BECAME LEADER - Starting leadership duties
+2024/01/10 14:30:27 👑 [node-a1b2c3d4-e5f6-7890-abcd-ef1234567890] Status: LEADER - Heartbeat at 14:30:27
+2024/01/10 14:30:28 👑 [node-a1b2c3d4-e5f6-7890-abcd-ef1234567890] Status: LEADER - Heartbeat at 14:30:28
 ```
 
 When you start additional instances:
 ```
 # Second instance output
-2024/01/10 14:30:30 👥 [node-hostname-5678-1704902430] Status: FOLLOWER - Heartbeat at 14:30:30
-2024/01/10 14:30:31 👥 [node-hostname-5678-1704902430] Status: FOLLOWER - Heartbeat at 14:30:31
+2024/01/10 14:30:30 👥 [node-b2c3d4e5-f6g7-8901-bcde-f23456789012] Status: FOLLOWER - Heartbeat at 14:30:30
+2024/01/10 14:30:31 👥 [node-b2c3d4e5-f6g7-8901-bcde-f23456789012] Status: FOLLOWER - Heartbeat at 14:30:31
 
 # Third instance output  
-2024/01/10 14:30:32 👥 [node-hostname-9012-1704902432] Status: FOLLOWER - Heartbeat at 14:30:32
-2024/01/10 14:30:33 👥 [node-hostname-9012-1704902432] Status: FOLLOWER - Heartbeat at 14:30:33
+2024/01/10 14:30:32 👥 [node-c3d4e5f6-g7h8-9012-cdef-345678901234] Status: FOLLOWER - Heartbeat at 14:30:32
+2024/01/10 14:30:33 👥 [node-c3d4e5f6-g7h8-9012-cdef-345678901234] Status: FOLLOWER - Heartbeat at 14:30:33
 ```
 
 When the leader stops:
 ```
 # Leader stops, follower takes over
-2024/01/10 14:30:45 [node-hostname-5678-1704902430] Successfully acquired leadership  
-2024/01/10 14:30:45 🎉 [node-hostname-5678-1704902430] BECAME LEADER - Starting leadership duties
-2024/01/10 14:30:45 👑 [node-hostname-5678-1704902430] Status: LEADER - Heartbeat at 14:30:45
+2024/01/10 14:30:45 [node-b2c3d4e5-f6g7-8901-bcde-f23456789012] Successfully acquired leadership  
+2024/01/10 14:30:45 🎉 [node-b2c3d4e5-f6g7-8901-bcde-f23456789012] BECAME LEADER - Starting leadership duties
+2024/01/10 14:30:45 👑 [node-b2c3d4e5-f6g7-8901-bcde-f23456789012] Status: LEADER - Heartbeat at 14:30:45
 ```
 
 ## Default Configuration
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| Node ID | `node-{hostname}-{pid}-{timestamp}` | Auto-generated unique identifier |
+| Node ID | `node-{uuid}` | Auto-generated UUID-based unique identifier |
 | Lock Name | `leader-election-demo` | Name of the leadership lock |
 | Lock Directory | `/tmp` | Directory to store lock files |
 | Lease Duration | `10s` | How long leadership lease lasts |
