@@ -33,15 +33,18 @@ func NewLeaderElector(nodeID string) *LeaderElector {
 
 func (le *LeaderElector) AcquireLease() {
 	log.Printf("[%s] Attempting to acquire leadership...", le.identity)
-	
+
+	ticker := time.NewTicker(RetryPeriod)
+	defer ticker.Stop()
+
 	for {
 		if le.tryAcquireLease() {
 			log.Printf("🎉 [%s] Successfully acquired leadership!", le.identity)
 			return
 		}
-		
+
 		log.Printf("[%s] Leadership not available, retrying in %v...", le.identity, RetryPeriod)
-		time.Sleep(RetryPeriod)
+		<-ticker.C
 	}
 }
 
@@ -78,7 +81,7 @@ func (le *LeaderElector) isLeaseExpired() bool {
 	if len(parts) != 2 {
 		return true
 	}
-	
+
 	timestamp, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil {
 		return true
