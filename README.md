@@ -38,7 +38,7 @@ This repository contains practical implementations of common distributed systems
 ├── external-dependency-risk/
 │   ├── retries-timeouts/           # Retries & Timeouts
 │   ├── data-caching/               # Data Caching
-│   └── circuit-breaker-fallback/   # Circuit Breaker & Fallback
+│   └── circuit-breaker/            # Circuit Breaker
 ├── go.mod
 ├── go.sum
 └── Makefile
