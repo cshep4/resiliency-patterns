@@ -1,14 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/cshep4/resiliency-patterns/high-availability/leader-election/internal/leaderelection"
+	"github.com/google/uuid"
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -22,24 +23,42 @@ func main() {
 	// Block until we acquire leadership
 	elector.AcquireLease()
 
-	// Now we are the leader, start heartbeat loop
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
+	// Create context for graceful shutdown
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer cancel()
 
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	// Create errgroup for managing goroutines
+	g, ctx := errgroup.WithContext(ctx)
 
-	log.Printf("✅ [%s] Now running as LEADER. Press Ctrl+C to stop", nodeID)
+	// Start lease monitoring
+	g.Go(func() error {
+		elector.MonitorLease(ctx, func() {
+			log.Printf("🛑 [%s] Lease lost, initiating shutdown...", nodeID)
+			cancel()
+		})
+		return nil
+	})
 
-	for {
-		select {
-		case <-sigChan:
-			log.Printf("🛑 [%s] Received shutdown signal, stopping...", nodeID)
-			log.Printf("👋 [%s] Shutdown complete", nodeID)
-			return
-		case <-ticker.C:
-			log.Printf("👑 [%s] Status: LEADER - Heartbeat at %s", 
-				nodeID, time.Now().Format("15:04:05"))
+	// Start heartbeat loop
+	g.Go(func() error {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-ticker.C:
+				log.Printf("👑 [%s] Status: LEADER - Heartbeat at %s",
+					nodeID, time.Now().Format("15:04:05"))
+			}
 		}
+	})
+
+	// Wait for all goroutines to complete
+	if err := g.Wait(); err != nil {
+		log.Printf("❌ [%s] Error: %v", nodeID, err)
 	}
+
+	log.Printf("👋 [%s] Shutdown complete", nodeID)
 }

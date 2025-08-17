@@ -1,6 +1,7 @@
 package leaderelection
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -34,17 +35,21 @@ func NewLeaderElector(nodeID string) *LeaderElector {
 func (le *LeaderElector) AcquireLease() {
 	log.Printf("[%s] Attempting to acquire leadership...", le.identity)
 
+	// Try once immediately
+	if le.tryAcquireLease() {
+		log.Printf("🎉 [%s] Successfully acquired leadership!", le.identity)
+		return
+	}
+
+	// If not successful, use ticker for retries
 	ticker := time.NewTicker(RetryPeriod)
 	defer ticker.Stop()
 
-	for {
+	for range ticker.C {
 		if le.tryAcquireLease() {
 			log.Printf("🎉 [%s] Successfully acquired leadership!", le.identity)
 			return
 		}
-
-		log.Printf("[%s] Leadership not available, retrying in %v...", le.identity, RetryPeriod)
-		<-ticker.C
 	}
 }
 
@@ -89,4 +94,51 @@ func (le *LeaderElector) isLeaseExpired() bool {
 
 	leaseTime := time.Unix(timestamp, 0)
 	return time.Since(leaseTime) > LeaseDuration
+}
+
+func (le *LeaderElector) MonitorLease(ctx context.Context, onShutdown func()) {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	log.Printf("[%s] Starting lease monitoring...", le.identity)
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Printf("[%s] Lease monitoring stopped", le.identity)
+			return
+		case <-ticker.C:
+			if !le.isCurrentLeader() {
+				log.Printf("🚨 [%s] Lease lost! Shutting down...", le.identity)
+				onShutdown()
+				return
+			}
+		}
+	}
+}
+
+func (le *LeaderElector) isCurrentLeader() bool {
+	data, err := os.ReadFile(le.lockFile)
+	if err != nil {
+		return false
+	}
+
+	parts := strings.Split(string(data), ":")
+	if len(parts) != 2 {
+		return false
+	}
+
+	// Check if we own the lease
+	if parts[0] != le.identity {
+		return false
+	}
+
+	// Check if lease is still valid
+	timestamp, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return false
+	}
+
+	leaseTime := time.Unix(timestamp, 0)
+	return time.Since(leaseTime) <= LeaseDuration
 }
