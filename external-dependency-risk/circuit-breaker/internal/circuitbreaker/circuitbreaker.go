@@ -78,7 +78,7 @@ func WithClock(clock clockwork.Clock) Option {
 }
 
 // New creates a new circuit breaker
-func New(service service.PaymentProcessor, failureThreshold int, cooldown time.Duration, maxRequests, successThreshold int, opts ...Option) (*circuitBreaker, error) {
+func New(service PaymentProcessor, failureThreshold int, cooldown time.Duration, maxRequests, successThreshold int, opts ...Option) (*circuitBreaker, error) {
 	switch {
 	case service == nil:
 		return nil, errors.New("service is nil")
