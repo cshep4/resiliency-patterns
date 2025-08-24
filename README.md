@@ -11,7 +11,7 @@ This repository contains practical implementations of common resiliency patterns
 ### Ensuring High Availability
 - **Active/Active Deployments** - Deploy multiple active instances to eliminate single points of failure
 - **Service Discovery & Registry** - Dynamic service registration and discovery for resilient architectures
-- **[Leader Election & Coordination](/high-availability/leader-election/)** - Coordinate distributed systems with leader election patterns
+- **[Leader Election](/high-availability/leader-election/)** - Coordinate distributed systems with leader election patterns
 
 ### Isolate Failures
 - **Bulkhead Pattern** - Isolate resources to prevent cascading failures across system components

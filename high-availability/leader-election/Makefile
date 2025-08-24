@@ -1,4 +1,4 @@
-.PHONY: help run demo build test clean fmt vet demo-parallel
+.PHONY: help run demo build clean demo-parallel
 
 # Default target
 help:
@@ -7,10 +7,7 @@ help:
 	@echo "  demo          - Run demo with instructions"
 	@echo "  demo-parallel - Run 3 instances in parallel (requires tmux)"
 	@echo "  build         - Build the binary"
-	@echo "  test          - Run tests"
 	@echo "  clean         - Clean build artifacts"
-	@echo "  fmt           - Format code"
-	@echo "  vet           - Run go vet"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run"
@@ -73,44 +70,11 @@ build:
 	go build -o $(BUILD_DIR)/$(BINARY_NAME) cmd/main.go
 	@echo "Binary built: $(BUILD_DIR)/$(BINARY_NAME)"
 
-# Run tests
-test:
-	go test ./internal/...
-
-# Run tests with coverage
-test-coverage:
-	go test -cover ./internal/...
-
-# Run tests with race detection
-test-race:
-	go test -race ./internal/...
-
-# Format code
-fmt:
-	go fmt ./...
-
-# Vet code
-vet:
-	go vet ./...
-
 # Clean build artifacts and lock files
 clean:
 	rm -rf $(BUILD_DIR)
 	rm -f /tmp/leader-election-demo.lock
 	go clean
-
-# Install dependencies
-deps:
-	go mod download
-	go mod tidy
-
-# Run all checks
-check: fmt vet test-race
-	@echo "All checks passed!"
-
-# Development workflow
-dev: clean fmt vet test build
-	@echo "Development build complete!"
 
 # Kill any running tmux session
 kill-demo:
