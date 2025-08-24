@@ -4,7 +4,10 @@
       "Bash(go test:*)",
       "Bash(go get:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(go generate:*)",
+      "Bash(go mod:*)",
+      "Bash(make:*)"
     ],
     "deny": [],
     "ask": []
