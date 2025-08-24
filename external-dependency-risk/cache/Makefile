@@ -1,4 +1,4 @@
-.PHONY: help run build test clean fmt vet
+.PHONY: help run build mocks test clean
 
 # Default target
 help:
@@ -6,9 +6,9 @@ help:
 	@echo "  run    - Run the cache example"
 	@echo "  build  - Build the binary"
 	@echo "  test   - Run tests"
+	@echo "  test-race - Run tests with race detection"
+	@echo "  mocks  - Generate mocks"
 	@echo "  clean  - Clean build artifacts"
-	@echo "  fmt    - Format code"
-	@echo "  vet    - Run go vet"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run"
@@ -34,20 +34,13 @@ test-race:
 	go test -race ./...
 
 # Run tests with coverage
-test-coverage:
+test-cover:
 	go test -cover ./...
+
+# Generate mocks
+mocks:
+	go generate ./...
 
 # Clean build artifacts
 clean:
 	rm -rf bin/
-
-# Format code
-fmt:
-	go fmt ./...
-
-# Run go vet
-vet:
-	go vet ./...
-
-# Run all checks
-check: fmt vet test

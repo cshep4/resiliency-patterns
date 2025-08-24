@@ -2,10 +2,13 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
+	"github.com/jonboulle/clockwork"
+	
 	"github.com/cshep4/resiliency-patterns/external-dependency-risk/cache/internal/service"
 )
 
@@ -16,8 +19,8 @@ type entry struct {
 }
 
 // IsExpired checks if the cache entry has expired
-func (e entry) IsExpired() bool {
-	return time.Now().After(e.ExpiresAt)
+func (e entry) IsExpired(clock clockwork.Clock) bool {
+	return clock.Now().After(e.ExpiresAt)
 }
 
 // UserService defines the interface for user operations
@@ -31,18 +34,44 @@ type cache struct {
 	lock    sync.RWMutex
 	entries map[string]entry
 	ttl     time.Duration
+	clock   clockwork.Clock
 }
 
-// New creates a new cache with the specified TTL
-func New(service UserService, ttl time.Duration) (*cache, error) {
-	if ttl <= 0 {
-		return nil, fmt.Errorf("ttl must be greater than 0")
+// Option is a functional option for configuring the cache
+type Option func(*cache) error
+
+// WithClock sets a custom clock for the cache
+func WithClock(clock clockwork.Clock) Option {
+	return func(c *cache) error {
+		if clock == nil {
+			return errors.New("clock is nil")
+		}
+		c.clock = clock
+		return nil
+	}
+}
+
+// New creates a new cache with the specified TTL and optional configurations
+func New(service UserService, ttl time.Duration, opts ...Option) (*cache, error) {
+	switch {
+	case service == nil:
+		return nil, errors.New("service is nil")
+	case ttl <= 0:
+		return nil, errors.New("ttl must be greater than 0")
 	}
 
 	c := &cache{
 		service: service,
 		entries: make(map[string]entry),
 		ttl:     ttl,
+		clock:   clockwork.NewRealClock(), // Default to real clock
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		if err := opt(c); err != nil {
+			return nil, err
+		}
 	}
 
 	return c, nil
@@ -55,7 +84,7 @@ func (c *cache) GetUser(ctx context.Context, id string) (service.User, error) {
 	c.lock.RLock()
 	cu, ok := c.entries[id]
 	c.lock.RUnlock()
-	if ok && !cu.IsExpired() {
+	if ok && !cu.IsExpired(c.clock) {
 		return cu.Value, nil // Cache hit & not expired
 	}
 
@@ -67,7 +96,7 @@ func (c *cache) GetUser(ctx context.Context, id string) (service.User, error) {
 
 	// Cache the result with new expiry
 	c.lock.Lock()
-	c.entries[id] = entry{Value: user, ExpiresAt: time.Now().Add(c.ttl)}
+	c.entries[id] = entry{Value: user, ExpiresAt: c.clock.Now().Add(c.ttl)}
 	c.lock.Unlock()
 
 	return user, nil

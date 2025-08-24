@@ -16,22 +16,18 @@ type User struct {
 	Created  time.Time `json:"created"`
 }
 
-// UserService defines the interface for user operations
-type UserService interface {
-	GetUser(ctx context.Context, id string) (User, error)
-	CreateUser(ctx context.Context, user User) error
-	UpdateUser(ctx context.Context, user User) error
-	DeleteUser(ctx context.Context, id string) error
-}
-
-// MockUserService simulates a slow external user service
-type MockUserService struct {
+// userService simulates a slow external user service
+type userService struct {
 	users map[string]User
 	delay time.Duration
 }
 
-// NewMockUserService creates a new mock user service
-func NewMockUserService(delay time.Duration) *MockUserService {
+// NewUserService creates a new user service
+func NewUserService(delay time.Duration) (*userService, error) {
+	if delay < 0 {
+		return nil, errors.New("delay must be greater than 0")
+	}
+
 	users := map[string]User{
 		"1": {ID: "1", Name: "Alice Johnson", Email: "alice@example.com", Created: time.Now().Add(-24 * time.Hour)},
 		"2": {ID: "2", Name: "Bob Smith", Email: "bob@example.com", Created: time.Now().Add(-12 * time.Hour)},
@@ -40,14 +36,16 @@ func NewMockUserService(delay time.Duration) *MockUserService {
 		"5": {ID: "5", Name: "Eve Wilson", Email: "eve@example.com", Created: time.Now().Add(-1 * time.Hour)},
 	}
 	
-	return &MockUserService{
+	s := &userService{
 		users: users,
 		delay: delay,
 	}
+
+	return s, nil
 }
 
 // GetUser retrieves a user by ID with simulated delay
-func (s *MockUserService) GetUser(ctx context.Context, id string) (User, error) {
+func (s *userService) GetUser(ctx context.Context, id string) (User, error) {
 	// Simulate network delay
 	select {
 	case <-time.After(s.delay):
@@ -66,65 +64,4 @@ func (s *MockUserService) GetUser(ctx context.Context, id string) (User, error) 
 	}
 	
 	return user, nil
-}
-
-// CreateUser creates a new user
-func (s *MockUserService) CreateUser(ctx context.Context, user User) error {
-	select {
-	case <-time.After(s.delay):
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	
-	if _, exists := s.users[user.ID]; exists {
-		return fmt.Errorf("user with id %s already exists", user.ID)
-	}
-	
-	user.Created = time.Now()
-	s.users[user.ID] = user
-	return nil
-}
-
-// UpdateUser updates an existing user
-func (s *MockUserService) UpdateUser(ctx context.Context, user User) error {
-	select {
-	case <-time.After(s.delay):
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	
-	if _, exists := s.users[user.ID]; !exists {
-		return fmt.Errorf("user with id %s not found", user.ID)
-	}
-	
-	// Preserve creation time
-	existing := s.users[user.ID]
-	user.Created = existing.Created
-	s.users[user.ID] = user
-	return nil
-}
-
-// DeleteUser removes a user
-func (s *MockUserService) DeleteUser(ctx context.Context, id string) error {
-	select {
-	case <-time.After(s.delay):
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	
-	if _, exists := s.users[id]; !exists {
-		return fmt.Errorf("user with id %s not found", id)
-	}
-	
-	delete(s.users, id)
-	return nil
-}
-
-// ListUsers returns all users (for demo purposes)
-func (s *MockUserService) ListUsers() []User {
-	users := make([]User, 0, len(s.users))
-	for _, user := range s.users {
-		users = append(users, user)
-	}
-	return users
 }

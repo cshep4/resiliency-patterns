@@ -4,31 +4,33 @@ The Data Caching pattern reduces dependency on external services by storing freq
 
 ## Overview
 
-This implementation provides a comprehensive caching solution with:
+This implementation provides a user service caching solution with:
 - **Thread-safe operations**: Concurrent read/write access with proper locking
 - **TTL support**: Automatic expiration of cached entries
-- **Service wrapper**: Easy integration with existing services
-- **Generic support**: Type-safe caching with Go generics
-- **Automatic cleanup**: Background removal of expired entries
+- **Service wrapper**: Easy integration with existing user services
+- **Clock injection**: Testable time operations using clockwork
+- **Error handling**: Proper error propagation and wrapping
 
 ## Key Components
 
-- `Cache`: Core thread-safe cache with TTL support
-- `ServiceCache[T]`: Generic service wrapper for caching function results
-- `Entry`: Cache entry with expiration tracking
-- Background cleanup goroutine for expired entries
+- `cache`: Core thread-safe cache with TTL support for user data
+- `UserService`: Interface for user operations
+- `entry`: Cache entry with expiration tracking
+- `service.userService`: Mock user service with configurable delay
+- Clock abstraction for testable time operations
 
 ## Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Application   │───▶│  ServiceCache   │───▶│  External API   │
+│   Application   │───▶│   User Cache    │───▶│  User Service   │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                               │
                               ▼
                        ┌─────────────────┐
                        │   Cache Store   │
                        │  (In-Memory)    │
+                       │   TTL-based     │
                        └─────────────────┘
 ```
 
@@ -37,6 +39,9 @@ This implementation provides a comprehensive caching solution with:
 ```bash
 # Run the example
 make run
+
+# Generate mocks
+make mocks
 
 # Run tests
 make test
@@ -47,104 +52,83 @@ make build
 
 ## API Examples
 
-### Basic Cache Operations
+### Creating a Cache
 ```go
-cache := cache.New(5 * time.Minute)
-
-// Store values
-cache.Set("user:123", user)
-cache.SetWithTTL("temp", data, 30*time.Second)
-
-// Retrieve values
-if value, found := cache.Get("user:123"); found {
-    user := value.(User)
-    // Use user data
+// Create a user service with 500ms delay to simulate slow external dependency
+userService, err := service.NewUserService(500 * time.Millisecond)
+if err != nil {
+    log.Fatalf("Failed to create user service: %v", err)
 }
 
-// Management
-cache.Delete("user:123")
-cache.Clear()
-fmt.Printf("Cache size: %d\n", cache.Size())
+// Create cache with 30 second TTL
+userCache, err := cache.New(userService, 30*time.Second)
+if err != nil {
+    log.Fatalf("Failed to create cache: %v", err)
+}
 ```
 
-### Service Caching
+### Using the Cache
 ```go
-// Wrap any service function
-cachedService := cache.NewServiceCache(2*time.Minute, 
-    func(ctx context.Context, id string) (User, error) {
-        return userService.GetUser(ctx, id)
-    })
+ctx := context.Background()
 
-// Use like normal service - caching is transparent
-user, err := cachedService.Get(ctx, "123")
+// First call - cache miss, calls underlying service
+user, err := userCache.GetUser(ctx, "1")
+if err != nil {
+    log.Printf("Error: %v", err)
+    return
+}
+fmt.Printf("User: %s (%s)\n", user.Name, user.Email)
 
-// Invalidate when data changes
-cachedService.Invalidate("123")
+// Second call - cache hit, returns immediately
+user, err = userCache.GetUser(ctx, "1")
+// This call is much faster!
+```
 
-// View cache statistics
-stats := cachedService.Stats()
+### Testing with Custom Clock
+```go
+// For testing, inject a fake clock
+fakeClock := clockwork.NewFakeClock()
+userCache, err := cache.New(userService, 10*time.Minute, cache.WithClock(fakeClock))
+
+// Advance time to test expiration
+fakeClock.Advance(11 * time.Minute)
 ```
 
 ## Example Output
 
 ```
-Data Caching Pattern Examples
-=============================
+🚀 Cache Demonstration
+======================
 
-Demo 1: Basic Cache Operations
-------------------------------
-Cache size: 3
-Cache keys: [key1 key2 key3]
-key1: Hello, World!
-key2: 42
-nonexistent: not found
-After deletion, cache size: 2
+📊 Cache Miss vs Cache Hit Demo
+--------------------------------
+🔍 First call (cache miss) for user 1...
+✅ Retrieved user: Alice Johnson (alice@example.com) in 503.2ms
+🔍 Second call (cache hit) for user 1...
+⚡ Retrieved user: Alice Johnson (alice@example.com) in 12.7µs (from cache!)
 
-Demo 2: Service Caching Performance
------------------------------------
-First call (cache miss):
-  → Calling external service for user 1...
-  User: Alice Johnson (alice@example.com)
-  Duration: 501ms
+🏎️  Performance Comparison
+---------------------------
+🔥 Warming up cache...
+⏱️  Fetching 4 users from cache...
+   📋 2: Bob Smith
+   📋 3: Charlie Brown
+   📋 4: Diana Wilson
+   📋 5: Eve Wilson
+🎯 Total time: 127.3µs (avg: 31.8µs per user)
+💡 Without cache, this would take ~2s (500ms per user)
 
-Second call (cache hit):
-  User: Alice Johnson (alice@example.com)
-  Duration: 45µs
+⏰ TTL Expiration Demo
+----------------------
+🔍 Initial call for user 1...
+✅ Got Alice Johnson in 502.1ms
+🔍 Immediate second call (should be cached)...
+⚡ Got Alice Johnson in 8.4µs (cached)
+⏳ Waiting for TTL to expire (2 seconds)...
+🔍 Call after TTL expiration...
+🔄 Got Alice Johnson in 501.8ms (cache expired, fetched fresh)
 
-Cache stats: map[keys:[1] size:1]
-
-Demo 3: Cache Invalidation and Updates
---------------------------------------
-Initial fetch:
-  → Service call for user 2
-  User: Bob Smith
-
-Cached fetch:
-  User: Bob Smith
-
-Updating user in service...
-
-Fetch after update (still cached):
-  User: Bob Smith
-
-Invalidating cache...
-
-Fetch after invalidation:
-  → Service call for user 2
-  User: Bob Smith Jr.
-
-Demo 4: TTL and Expiration
--------------------------
-Setting value with 2-second TTL...
-Immediately: This will expire soon
-Waiting 1 second...
-After 1s: This will expire soon
-Waiting 2 more seconds...
-After 3s: expired (not found)
-
-Setting value with custom 1-second TTL...
-Immediately: Custom TTL value
-After 1.5s: expired (not found)
+🎉 Cache demonstration complete!
 ```
 
 ## Pattern Benefits
@@ -157,52 +141,65 @@ After 1.5s: expired (not found)
 
 ## Cache Strategies
 
-### Cache-Aside (Lazy Loading)
+This implementation uses the **Cache-Aside (Lazy Loading)** pattern where:
+
+1. **Cache Miss**: When data isn't in cache, fetch from service and store in cache
+2. **Cache Hit**: When data exists and isn't expired, return from cache
+3. **TTL Expiration**: Cached data automatically expires after the configured TTL
+
 ```go
-func GetUser(ctx context.Context, id string) (User, error) {
+// The cache implementation handles this pattern automatically
+func (c *cache) GetUser(ctx context.Context, id string) (service.User, error) {
     // Check cache first
-    if user, found := cache.Get(id); found {
-        return user.(User), nil
+    c.lock.RLock()
+    cu, ok := c.entries[id]
+    c.lock.RUnlock()
+    if ok && !cu.IsExpired(c.clock) {
+        return cu.Value, nil // Cache hit & not expired
     }
-    
-    // Load from database
-    user, err := db.GetUser(ctx, id)
+
+    // Cache miss or expired - fetch from service
+    user, err := c.service.GetUser(ctx, id)
     if err != nil {
-        return User{}, err
+        return service.User{}, fmt.Errorf("failed to get user %s: %w", id, err)
     }
-    
-    // Store in cache
-    cache.Set(id, user)
+
+    // Cache the result with new expiry
+    c.lock.Lock()
+    c.entries[id] = entry{Value: user, ExpiresAt: c.clock.Now().Add(c.ttl)}
+    c.lock.Unlock()
+
     return user, nil
 }
 ```
 
-### Write-Through
+### Extension Patterns
+
+For production use, you might extend this to support:
+
+**Write-Through Pattern**
 ```go
-func UpdateUser(ctx context.Context, user User) error {
-    // Update database
-    if err := db.UpdateUser(ctx, user); err != nil {
+// Update service and cache simultaneously
+func (c *cache) UpdateUser(ctx context.Context, user service.User) error {
+    if err := c.service.UpdateUser(ctx, user); err != nil {
         return err
     }
     
-    // Update cache
-    cache.Set(user.ID, user)
+    // Update cache with fresh TTL
+    c.lock.Lock()
+    c.entries[user.ID] = entry{Value: user, ExpiresAt: c.clock.Now().Add(c.ttl)}
+    c.lock.Unlock()
+    
     return nil
 }
 ```
 
-### Write-Behind (Write-Back)
+**Cache Invalidation**
 ```go
-func UpdateUser(ctx context.Context, user User) error {
-    // Update cache immediately
-    cache.Set(user.ID, user)
-    
-    // Schedule async database update
-    go func() {
-        db.UpdateUser(context.Background(), user)
-    }()
-    
-    return nil
+func (c *cache) InvalidateUser(id string) {
+    c.lock.Lock()
+    delete(c.entries, id)
+    c.lock.Unlock()
 }
 ```
 
@@ -228,11 +225,36 @@ func UpdateUser(ctx context.Context, user User) error {
 
 ## Testing
 
-The implementation includes comprehensive examples demonstrating:
-- Basic cache operations and lifecycle
-- Performance comparison (cached vs uncached)
-- Cache invalidation and data consistency
-- TTL behavior and expiration handling
-- Service integration patterns
+The implementation includes comprehensive test coverage with:
 
-Run `make test` to execute the test suite with race detection and coverage reporting.
+### Test Features
+- **Mock Dependencies**: Uses `gomock` for service mocking
+- **Time Control**: Injects fake clocks for deterministic TTL testing  
+- **Error Scenarios**: Tests service failures and context cancellation
+- **Concurrency Safety**: Race detection enabled
+- **Edge Cases**: Nil services, invalid TTLs, expired entries
+
+### Key Test Cases
+- Cache creation with valid/invalid parameters
+- Cache miss/hit scenarios 
+- TTL expiration behavior with fake clocks
+- Service error propagation
+- Context cancellation handling
+- Functional options (custom clock injection)
+
+### Running Tests
+```bash
+# Run all tests
+make test
+
+# Run with verbose output
+go test -v ./...
+
+# Run with race detection
+make test-race
+
+# Run with coverage
+make test-cover
+```
+
+The test suite uses `testify/require` for assertions and demonstrates best practices for testing time-dependent code with clock injection.

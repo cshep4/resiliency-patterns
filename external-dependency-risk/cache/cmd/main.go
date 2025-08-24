@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"time"
 
 	"github.com/cshep4/resiliency-patterns/external-dependency-risk/cache/internal/cache"
@@ -10,221 +10,165 @@ import (
 )
 
 func main() {
-	fmt.Println("Data Caching Pattern Examples")
-	fmt.Println("=============================")
-	fmt.Println()
+	log.Println("🚀 Cache Demonstration")
+	log.Println("======================")
 
-	// Demo 1: Basic cache operations
-	basicCacheDemo()
-	
-	fmt.Println()
-	
-	// Demo 2: Service caching with performance comparison
-	serviceCacheDemo()
-	
-	fmt.Println()
-	
-	// Demo 3: Cache invalidation and updates
-	cacheInvalidationDemo()
-	
-	fmt.Println()
-	
-	// Demo 4: TTL and expiration behavior
-	ttlDemo()
-}
+	// Create a slow user service (simulating external dependency)
+	userService, err := service.NewUserService(500 * time.Millisecond)
+	if err != nil {
+		log.Fatalf("Failed to create user service: %v", err)
+	}
 
-func basicCacheDemo() {
-	fmt.Println("Demo 1: Basic Cache Operations")
-	fmt.Println("------------------------------")
-	
-	cache := cache.New(5 * time.Minute)
-	
-	// Set some values
-	cache.Set("key1", "Hello, World!")
-	cache.Set("key2", 42)
-	cache.Set("key3", []string{"apple", "banana", "cherry"})
-	
-	fmt.Printf("Cache size: %d\n", cache.Size())
-	fmt.Printf("Cache keys: %v\n", cache.Keys())
-	
-	// Get values
-	if value, found := cache.Get("key1"); found {
-		fmt.Printf("key1: %v\n", value)
+	// Create cache with 30 second TTL
+	userCache, err := cache.New(userService, 30*time.Second)
+	if err != nil {
+		log.Fatalf("Failed to create cache: %v", err)
 	}
-	
-	if value, found := cache.Get("key2"); found {
-		fmt.Printf("key2: %v\n", value)
-	}
-	
-	if value, found := cache.Get("nonexistent"); found {
-		fmt.Printf("nonexistent: %v\n", value)
-	} else {
-		fmt.Println("nonexistent: not found")
-	}
-	
-	// Delete a key
-	cache.Delete("key2")
-	fmt.Printf("After deletion, cache size: %d\n", cache.Size())
-}
-
-func serviceCacheDemo() {
-	fmt.Println("Demo 2: Service Caching Performance")
-	fmt.Println("-----------------------------------")
-	
-	// Create a slow mock service (500ms delay)
-	mockService := service.NewMockUserService(500 * time.Millisecond)
-	
-	// Create cached service wrapper
-	cachedService := cache.NewServiceCache(2*time.Minute, func(ctx context.Context, id string) (service.User, error) {
-		fmt.Printf("  → Calling external service for user %s...\n", id)
-		return mockService.GetUser(ctx, id)
-	})
 
 	ctx := context.Background()
+
+	log.Println()
+
+	// Demonstrate cache miss and hit scenarios
+	demonstrateCacheHit(ctx, userCache)
+
+	log.Println()
+	
+	// Demonstrate performance benefits
+	demonstratePerformance(ctx, userCache)
+
+	log.Println()
+	
+	// Demonstrate TTL expiration with shorter TTL cache
+	demonstrateTTLExpiration()
+
+	log.Println()
+	log.Println("🎉 Cache demonstration complete!")
+}
+
+func demonstrateCacheHit(ctx context.Context, userCache cache.UserService) {
+	log.Println("📊 Cache Miss vs Cache Hit Demo")
+	log.Println("--------------------------------")
+	
 	userID := "1"
 	
-	fmt.Println("First call (cache miss):")
+	// First call - cache miss
+	log.Printf("🔍 First call (cache miss) for user %s...\n", userID)
 	start := time.Now()
-	user, err := cachedService.Get(ctx, userID)
+	user, err := userCache.GetUser(ctx, userID)
 	duration := time.Since(start)
 	
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("Error getting user: %v", err)
 		return
 	}
 	
-	fmt.Printf("  User: %s (%s)\n", user.Name, user.Email)
-	fmt.Printf("  Duration: %v\n", duration)
+	log.Printf("✅ Retrieved user: %s (%s) in %v\n", user.Name, user.Email, duration)
 	
-	fmt.Println("\nSecond call (cache hit):")
+	// Second call - cache hit
+	log.Printf("🔍 Second call (cache hit) for user %s...\n", userID)
 	start = time.Now()
-	user, err = cachedService.Get(ctx, userID)
+	user, err = userCache.GetUser(ctx, userID)
 	duration = time.Since(start)
 	
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("Error getting user: %v", err)
 		return
 	}
 	
-	fmt.Printf("  User: %s (%s)\n", user.Name, user.Email)
-	fmt.Printf("  Duration: %v\n", duration)
-	
-	// Show cache stats
-	stats := cachedService.Stats()
-	fmt.Printf("\nCache stats: %+v\n", stats)
+	log.Printf("⚡ Retrieved user: %s (%s) in %v (from cache!)\n", user.Name, user.Email, duration)
 }
 
-func cacheInvalidationDemo() {
-	fmt.Println("Demo 3: Cache Invalidation and Updates")
-	fmt.Println("--------------------------------------")
+func demonstratePerformance(ctx context.Context, userCache cache.UserService) {
+	log.Println("🏎️  Performance Comparison")
+	log.Println("---------------------------")
 	
-	mockService := service.NewMockUserService(100 * time.Millisecond)
-	cachedService := cache.NewServiceCache(5*time.Minute, func(ctx context.Context, id string) (service.User, error) {
-		fmt.Printf("  → Service call for user %s\n", id)
-		return mockService.GetUser(ctx, id)
-	})
+	userIDs := []string{"2", "3", "4", "5"}
+	
+	// Warm up the cache
+	log.Println("🔥 Warming up cache...")
+	for _, id := range userIDs {
+		_, err := userCache.GetUser(ctx, id)
+		if err != nil {
+			log.Printf("Error getting user, retrying: %s: %v", id, err)
+			_, err = userCache.GetUser(ctx, id)
+			if err != nil {
+				log.Printf("Error getting user, skipping: %s: %v", id, err)
+				continue
+			}
+		}
+	}
+	
+	// Benchmark cached requests
+	log.Printf("⏱️  Fetching %d users from cache...\n", len(userIDs))
+	start := time.Now()
+	
+	for _, id := range userIDs {
+		user, err := userCache.GetUser(ctx, id)
+		if err != nil {
+			log.Printf("Error getting user %s: %v", id, err)
+			continue
+		}
+		log.Printf("   📋 %s: %s\n", user.ID, user.Name)
+	}
+	
+	totalDuration := time.Since(start)
+	avgDuration := totalDuration / time.Duration(len(userIDs))
+	
+	log.Printf("🎯 Total time: %v (avg: %v per user)\n", totalDuration, avgDuration)
+	log.Printf("💡 Without cache, this would take ~%v (500ms per user)\n", 
+		time.Duration(len(userIDs))*500*time.Millisecond)
+}
+
+func demonstrateTTLExpiration() {
+	log.Println("⏰ TTL Expiration Demo")
+	log.Println("----------------------")
+	
+	// Create service and cache with very short TTL for demo
+	userService, err := service.NewUserService(100 * time.Millisecond)
+	if err != nil {
+		log.Fatalf("Failed to create user service: %v", err)
+	}
+	
+	shortTTLCache, err := cache.New(userService, 2*time.Second)
+	if err != nil {
+		log.Fatalf("Failed to create short TTL cache: %v", err)
+	}
 	
 	ctx := context.Background()
-	userID := "2"
+	userID := "1"
 	
-	// Initial fetch
-	fmt.Println("Initial fetch:")
-	user, err := cachedService.Get(ctx, userID)
+	// First call
+	log.Printf("🔍 Initial call for user %s...\n", userID)
+	start := time.Now()
+	user, err := shortTTLCache.GetUser(ctx, userID)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("Error: %v", err)
 		return
 	}
-	fmt.Printf("  User: %s\n", user.Name)
+	log.Printf("✅ Got %s in %v\n", user.Name, time.Since(start))
 	
-	// Cached fetch
-	fmt.Println("\nCached fetch:")
-	user, err = cachedService.Get(ctx, userID)
+	// Immediate second call (cache hit)
+	log.Printf("🔍 Immediate second call (should be cached)...\n")
+	start = time.Now()
+	user, err = shortTTLCache.GetUser(ctx, userID)
 	if err != nil {
-		fmt.Printf("Error: %v\n", err)
+		log.Printf("Error: %v", err)
 		return
 	}
-	fmt.Printf("  User: %s\n", user.Name)
+	log.Printf("⚡ Got %s in %v (cached)\n", user.Name, time.Since(start))
 	
-	// Update user in service
-	fmt.Println("\nUpdating user in service...")
-	updatedUser := user
-	updatedUser.Name = "Bob Smith Jr."
-	updatedUser.Email = "bob.jr@example.com"
-	err = mockService.UpdateUser(ctx, updatedUser)
+	// Wait for TTL to expire
+	log.Printf("⏳ Waiting for TTL to expire (2 seconds)...\n")
+	time.Sleep(2100 * time.Millisecond)
+	
+	// Third call after expiration
+	log.Printf("🔍 Call after TTL expiration...\n")
+	start = time.Now()
+	user, err = shortTTLCache.GetUser(ctx, userID)
 	if err != nil {
-		fmt.Printf("Error updating user: %v\n", err)
+		log.Printf("Error: %v", err)
 		return
 	}
-	
-	// Fetch again (still cached, old data)
-	fmt.Println("\nFetch after update (still cached):")
-	user, err = cachedService.Get(ctx, userID)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	fmt.Printf("  User: %s\n", user.Name)
-	
-	// Invalidate cache
-	fmt.Println("\nInvalidating cache...")
-	cachedService.Invalidate(userID)
-	
-	// Fetch again (cache miss, fresh data)
-	fmt.Println("\nFetch after invalidation:")
-	user, err = cachedService.Get(ctx, userID)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-	fmt.Printf("  User: %s\n", user.Name)
-}
-
-func ttlDemo() {
-	fmt.Println("Demo 4: TTL and Expiration")
-	fmt.Println("-------------------------")
-	
-	// Create cache with short TTL for demo
-	shortCache := cache.New(2 * time.Second)
-	
-	fmt.Println("Setting value with 2-second TTL...")
-	shortCache.Set("temp", "This will expire soon")
-	
-	// Check immediately
-	if value, found := shortCache.Get("temp"); found {
-		fmt.Printf("Immediately: %v\n", value)
-	}
-	
-	// Wait 1 second
-	fmt.Println("Waiting 1 second...")
-	time.Sleep(1 * time.Second)
-	
-	if value, found := shortCache.Get("temp"); found {
-		fmt.Printf("After 1s: %v\n", value)
-	}
-	
-	// Wait another 2 seconds (total 3 seconds, should be expired)
-	fmt.Println("Waiting 2 more seconds...")
-	time.Sleep(2 * time.Second)
-	
-	if value, found := shortCache.Get("temp"); found {
-		fmt.Printf("After 3s: %v\n", value)
-	} else {
-		fmt.Println("After 3s: expired (not found)")
-	}
-	
-	// Demo custom TTL
-	fmt.Println("\nSetting value with custom 1-second TTL...")
-	shortCache.SetWithTTL("custom", "Custom TTL value", 1*time.Second)
-	
-	if value, found := shortCache.Get("custom"); found {
-		fmt.Printf("Immediately: %v\n", value)
-	}
-	
-	time.Sleep(1500 * time.Millisecond)
-	
-	if value, found := shortCache.Get("custom"); found {
-		fmt.Printf("After 1.5s: %v\n", value)
-	} else {
-		fmt.Println("After 1.5s: expired (not found)")
-	}
+	log.Printf("🔄 Got %s in %v (cache expired, fetched fresh)\n", user.Name, time.Since(start))	
 }
