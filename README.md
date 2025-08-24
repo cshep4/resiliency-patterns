@@ -18,7 +18,7 @@ This repository contains practical implementations of common resiliency patterns
 - **CQRS** - Command Query Responsibility Segregation for separating read and write operations
 
 ### Mitigating External Dependency Risk
-- **Retries & Timeouts** - Intelligent retry mechanisms with exponential backoff and proper timeout handling
+- **[Retries & Timeouts](/external-dependency-risk/retry/)** - Intelligent retry mechanisms with exponential backoff and proper timeout handling
 - **[Data Caching](/external-dependency-risk/cache/)** - Cache strategies to reduce load on external services and improve performance
 - **[Circuit Breaker](/external-dependency-risk/circuit-breaker/)** - Prevent cascading failures with circuit breakers
 
